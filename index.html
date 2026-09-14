@@ -855,25 +855,20 @@
         // Data Storage & Cloud Sync
         const STORAGE_KEY = 'MindMap_Data_V4_Dark';
         
+        // Data Storage & Cloud Sync
+        const STORAGE_KEY = 'MindMap_Data_V4_Dark';
+
         // --- CẤU HÌNH CLOUD SYNC (FIREBASE) ---
         // LƯU Ý: Nếu mang lên GitHub cá nhân, hãy thay null bằng cấu hình Firebase của bạn
         // VD: const myGitHubFirebaseConfig = { apiKey: "...", authDomain: "...", projectId: "..." };
-        const firebaseConfig = {
-
+        const myGitHubFirebaseConfig = {
             apiKey: "AIzaSyC4Ws78vIYlGu1YrCCe73ARRsFdSjWjn70",
-
             authDomain: "hhtt-mindmap-webhost.firebaseapp.com",
-
             projectId: "hhtt-mindmap-webhost",
-
             storageBucket: "hhtt-mindmap-webhost.firebasestorage.app",
-
             messagingSenderId: "648852328702",
-
             appId: "1:648852328702:web:dc254c79efee507d4b15af",
-
             measurementId: "G-7NBFW6V9EG"
-
         };
 
         const envFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
