@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMap - Hiệp Hội Tình Thương</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-color: #111827; /* gray-900 */
+            --grid-color: #1f2937; /* gray-800 */
+            --node-bg: #1f2937;
+            --node-border: #374151; /* gray-700 */
+            --text-main: #f9fafb; /* gray-50 */
+            --text-muted: #9ca3af; /* gray-400 */
+            --line-color: #4b5563; /* gray-600 */
+            --accent: #3b82f6; /* blue-500 */
+            --accent-hover: #2563eb; /* blue-600 */
+            --danger: #ef4444; /* red-500 */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Toolbar */
+        #toolbar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(31, 41, 55, 0.9);
+            padding: 10px 20px;
+            border-radius: 12px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            border: 1px solid var(--node-border);
+        }
+
+        .tool-btn {
+            background: var(--node-border);
+            color: var(--text-main);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .tool-btn:hover {
+            background: var(--line-color);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+        }
+        
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        #viewport {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+        }
+        
+        #viewport:active {
+            cursor: grabbing;
+        }
+
+        /* 
+         * Khung chứa khổng lồ 6000x6000 
+         * Origin ở top-left, ta sẽ dùng transform để di chuyển và zoom
+         */
+        #map-container {
+            width: 6000px;
+            height: 6000px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+            background-size: 50px 50px;
+            background-image: 
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+        }
+
+        #svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #svg-layer text {
+            pointer-events: auto;
+            transition: all 0.3s;
+        }
+        
+        body.edit-mode #svg-layer text {
+            cursor: pointer;
+        }
+        
+        body.edit-mode #svg-layer text:hover {
+            fill: #60a5fa !important;
+        }
+
+        #nodes-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .node, .sub-node {
+            position: absolute;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+            transform-origin: center center;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        body.edit-mode .node, body.edit-mode .sub-node {
+            cursor: grab;
+        }
+        body.edit-mode .node:active, body.edit-mode .sub-node:active {
+            cursor: grabbing;
+        }
+
+        /* Main Node */
+        .node {
+            width: 200px;
+            height: 100px;
+            border-radius: 12px;
+            padding: 16px;
+            font-weight: 600;
+            font-size: 14px;
+            line-height: 1.4;
+            border: 2px solid var(--node-border);
+            background-color: var(--node-bg);
+            z-index: 25;
+        }
+
+        /* Sub Node */
+        .sub-node {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            padding: 16px;
+            background-color: var(--node-bg);
+            border: 2px solid var(--line-color);
+            font-size: 13px;
+            line-height: 1.3;
+            z-index: 22;
+        }
+
+        /* Hiệu ứng Dimming (Làm mờ) khi Focus */
+        .dimmed {
+            opacity: 0.15 !important;
+        }
+        
+        /* Hiệu ứng Scale khi Focus */
+        .focused {
+            transform: translate(-50%, -50%) scale(1.2) !important;
+            box-shadow: 0 0 30px rgba(255,255,255,0.2);
+            z-index: 30 !important;
+        }
+
+        /* Modals & Menus */
+        #context-menu {
+            position: fixed;
+            background: var(--node-border);
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 180px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+            border: 1px solid #4b5563;
+        }
+
+        .menu-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            color: var(--text-main);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-item:hover {
+            background: var(--line-color);
+        }
+        
+        .menu-item.danger {
+            color: #fca5a5;
+        }
+        .menu-item.danger:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Project Title UI */
+        #project-title-container {
+            position: fixed;
+            top: 70px; /* Below toolbar */
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(31, 41, 55, 0.85);
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            backdrop-filter: blur(5px);
+            border: 1px solid var(--node-border);
+            z-index: 100;
+            text-align: center;
+            transition: opacity 0.3s ease;
+            cursor: pointer; /* To indicate it's editable */
+        }
+        
+        #project-title-container:hover {
+            background: rgba(31, 41, 55, 0.95);
+            border-color: var(--line-color);
+        }
+
+        #project-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0;
+            letter-spacing: 0.5px;
+        }
+
+        #project-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        /* Edit Title Modal */
+        #edit-title-modal .modal-content {
+            width: 400px;
+        }
+
+        /* Base Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .modal-content {
+            background: var(--node-bg);
+            border: 1px solid var(--line-color);
+            padding: 24px;
+            border-radius: 12px;
+            width: 450px;
+            max-width: 90vw;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--line-color);
+            padding-bottom: 8px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            background: var(--grid-color);
+            border: 1px solid var(--line-color);
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        .btn-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .translate-btn {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+            margin-top: -30px;
+            margin-right: 5px;
+            position: relative;
+        }
+        
+        .translate-btn:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        /* Chế độ UI */
+        .mode-read { background: #4b5563; }
+        .mode-edit { background: #d97706; }
+        
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <button class="tool-btn mode-read" id="btn-toggle-edit" title="Bật/Tắt chế độ chỉnh sửa">Chế độ: Đọc</button>
+        <div style="width: 1px; background: var(--line-color); margin: 0 4px;"></div>
+        <button class="tool-btn" id="btn-lang" title="Đổi ngôn ngữ">VI / EN</button>
+        <button class="tool-btn btn-primary" id="btn-export" title="Lưu File">Lưu</button>
+        <button class="tool-btn" style="background: #10b981;" id="btn-import" title="Tải File">Tải</button>
+        <div style="width: 1px; background: var(--line-color); margin: 0 4px;"></div>
+        <button class="tool-btn" id="btn-zoom-in" title="Phóng to">+</button>
+        <button class="tool-btn" id="btn-zoom-out" title="Thu nhỏ">-</button>
+        <button class="tool-btn" id="btn-zoom-fit" title="Bao quát toàn bộ">Fit (1x)</button>
+    </div>
+
+    <!-- Project Title UI -->
+    <div id="project-title-container" title="Click để sửa Tiêu Đề">
+        <h1 id="project-title">MIND MAP: HIỆP HỘI TÌNH THƯƠNG</h1>
+        <div id="project-subtitle">Phân tích đường dây câu chuyện & Cao trào nhân vật Long</div>
+    </div>
+
+    <div id="viewport">
+        <div id="map-container">
+            <svg id="svg-layer"></svg>
+            <div id="nodes-layer"></div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="context-menu"></div>
+
+    <!-- Edit Note Modal -->
+    <div class="modal-overlay" id="edit-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="edit-modal-title">Chỉnh sửa nội dung</div>
+            <div class="form-group">
+                <label>Tiếng Việt</label>
+                <textarea id="edit-text-vi" class="form-control" rows="3"></textarea>
+                <button class="translate-btn" onclick="translateTextUI('vi', 'en', 'edit-text-vi', 'edit-text-en')">✨ Dịch sang EN</button>
+            </div>
+            <div class="form-group">
+                <label>Tiếng Anh</label>
+                <textarea id="edit-text-en" class="form-control" rows="3"></textarea>
+                <button class="translate-btn" onclick="translateTextUI('en', 'vi', 'edit-text-en', 'edit-text-vi')">✨ Dịch sang VI</button>
+            </div>
+            <div class="form-group" id="color-picker-group">
+                <label>Màu nền</label>
+                <input type="color" id="edit-bg-color" class="form-control" style="height: 40px; padding: 2px;">
+                <label class="mt-2">Màu chữ</label>
+                <input type="color" id="edit-text-color" class="form-control" style="height: 40px; padding: 2px;">
+            </div>
+            <div class="btn-group">
+                <button class="tool-btn" onclick="closeModals()">Hủy</button>
+                <button class="tool-btn btn-primary" onclick="saveEdit()">Lưu thay đổi</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Export / Import Modal -->
+    <div class="modal-overlay" id="io-modal">
+        <div class="modal-content" style="width: 500px;">
+            <div class="modal-title" id="io-modal-title">Lưu / Tải Dữ Liệu</div>
+            <div id="io-export-section" style="display: none;">
+                <p class="text-sm text-gray-300 mb-4">Bạn có thể tải file về máy, hoặc copy đoạn mã bên dưới nếu trình duyệt chặn tải xuống.</p>
+                <textarea id="export-code" class="form-control" rows="4" readonly></textarea>
+                <div class="btn-group">
+                    <button class="tool-btn" onclick="closeModals()">Đóng</button>
+                    <button class="tool-btn" style="background: #8b5cf6;" onclick="copyExportCode()">Copy Code</button>
+                    <button class="tool-btn btn-primary" onclick="triggerDownload()">Tải File (.json)</button>
+                </div>
+            </div>
+            
+            <div id="io-import-section" style="display: none;">
+                <p class="text-sm text-gray-300 mb-4">Dán đoạn mã (code) vào đây, hoặc chọn file .json từ máy tính của bạn.</p>
+                <textarea id="import-code" class="form-control" rows="4" placeholder="Dán mã code vào đây..."></textarea>
+                <div class="mt-4 flex items-center justify-between">
+                    <input type="file" id="import-file" accept=".json" class="text-sm text-gray-400">
+                </div>
+                <div class="btn-group">
+                    <button class="tool-btn" onclick="closeModals()">Hủy</button>
+                    <button class="tool-btn btn-primary" onclick="processImport()">Phục hồi dữ liệu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Message Box Modal -->
+    <div class="modal-overlay" id="msg-modal">
+        <div class="modal-content" style="width: 350px;">
+            <div class="modal-title" id="msg-modal-title">Thông báo</div>
+            <p id="msg-modal-content" class="text-sm text-gray-200"></p>
+            <div class="btn-group mt-6">
+                <button class="tool-btn btn-primary" onclick="closeModals()">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Project Title Modal -->
+    <div class="modal-overlay" id="edit-title-modal">
+        <div class="modal-content">
+            <div class="modal-title">Sửa Tiêu Đề Dự Án</div>
+            <div class="form-group">
+                <label>Tiêu đề (Tiếng Việt)</label>
+                <input type="text" id="title-main-vi" class="form-control" value="MIND MAP: HIỆP HỘI TÌNH THƯƠNG">
+                <button class="translate-btn" onclick="translateTextUI('vi', 'en', 'title-main-vi', 'title-main-en')" style="margin-top: 4px; float:none; display:inline-block">✨ Dịch sang EN</button>
+            </div>
+            <div class="form-group">
+                <label>Tiêu đề (Tiếng Anh)</label>
+                <input type="text" id="title-main-en" class="form-control" value="MIND MAP: COMPASSION ASSOCIATION">
+                <button class="translate-btn" onclick="translateTextUI('en', 'vi', 'title-main-en', 'title-main-vi')" style="margin-top: 4px; float:none; display:inline-block">✨ Dịch sang VI</button>
+            </div>
+            <div class="form-group">
+                <label>Mô tả phụ (Tiếng Việt)</label>
+                <input type="text" id="title-sub-vi" class="form-control" value="Phân tích đường dây câu chuyện & Cao trào nhân vật Long">
+            </div>
+            <div class="form-group">
+                <label>Mô tả phụ (Tiếng Anh)</label>
+                <input type="text" id="title-sub-en" class="form-control" value="Storyline Analysis & Character Arc of Long">
+            </div>
+            <div class="btn-group">
+                <button class="tool-btn" onclick="closeModals()">Hủy</button>
+                <button class="tool-btn btn-primary" onclick="saveProjectTitle()">Lưu Tiêu Đề</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Global variables for canvas mapping
+        const viewport = document.getElementById('viewport');
+        const mapContainer = document.getElementById('map-container');
+        const svgLayer = document.getElementById('svg-layer');
+        const nodesLayer = document.getElementById('nodes-layer');
+        const contextMenu = document.getElementById('context-menu');
+        
+        let currentLang = 'vi';
+        let isEditMode = false;
+        
+        // Pan & Zoom State
+        let transform = { x: 0, y: 0, scale: 1 };
+        let isPanning = false;
+        let startPanMouse = { x: 0, y: 0 };
+        let startPanTransform = { x: 0, y: 0 };
+        let wasPanning = false; // To differentiate click vs drag
+        
+        // Focus / Selection State
+        let activeMainNodeId = null;
+        let draggingElement = null; // { type, id }
+        let currentContextData = null; // { type, id, connectionIndex }
+
+        // Project Title State
+        let projectTitleData = {
+            vi: { main: "MIND MAP: HIỆP HỘI TÌNH THƯƠNG", sub: "Phân tích đường dây câu chuyện & Cao trào nhân vật Long" },
+            en: { main: "MIND MAP: COMPASSION ASSOCIATION", sub: "Storyline Analysis & Character Arc of Long" }
+        };
+
+        // Mảng màu gradient thể hiện cao trào (từ xanh -> đỏ -> cam -> xanh)
+        const climaxColors = [
+            { bg: '#3b82f6', text: '#ffffff' }, // 1. Bắt đầu (Xanh)
+            { bg: '#8b5cf6', text: '#ffffff' }, // 2. Phát triển (Tím)
+            { bg: '#ef4444', text: '#ffffff' }, // 3. Rơi vào bẫy (Đỏ)
+            { bg: '#374151', text: '#ffffff' }, // 4. Bỏ cuộc (Xám tối)
+            { bg: '#f59e0b', text: '#ffffff' }, // 5. Nhận ra (Cam)
+            { bg: '#10b981', text: '#ffffff' }, // 6. Trở lại (Xanh lá)
+            { bg: '#2563eb', text: '#ffffff' }  // 7. Anh hùng thực sự (Xanh dương đậm)
+        ];
+
+        let nodes = [];
+        let subNodes = [];
+        let connections = [];
+
+        // Khởi tạo Dữ liệu Mặc định (Default Data)
+        function initDefaultData() {
+            nodes = [
+                { id: 'n1', x: 2500, y: 3000, vi: "1. Long muốn trở thành anh hùng để được nổi tiếng", en: "1. Long wants to be a hero to become famous", bgColor: climaxColors[0].bg, textColor: climaxColors[0].text },
+                { id: 'n2', x: 2900, y: 2600, vi: "2. Long gia nhập Hiệp Hội Tình Thương và mạnh mẽ hơn", en: "2. Long joins the Charity Association and becomes stronger", bgColor: climaxColors[1].bg, textColor: climaxColors[1].text },
+                { id: 'n3', x: 3300, y: 3500, vi: "3. Long bị băng Dơ Dáy bắt cóc, tra tấn và bị thương nặng", en: "3. Long is kidnapped by the Filthy Gang, tortured, and severely injured", bgColor: climaxColors[2].bg, textColor: climaxColors[2].text },
+                { id: 'n4', x: 3700, y: 4000, vi: "4. Long từ bỏ làm anh hùng và trở về cuộc sống bình thường", en: "4. Long gives up being a hero and returns to a normal life", bgColor: climaxColors[3].bg, textColor: climaxColors[3].text },
+                { id: 'n5', x: 4100, y: 3600, vi: "5. Long nhận ra mình dần trở thành một villain mà trước đây từng chống lại", en: "5. Long realizes he is slowly becoming the villain he once fought against", bgColor: climaxColors[4].bg, textColor: climaxColors[4].text },
+                { id: 'n6', x: 4500, y: 2300, vi: "6. Long quyết định quay lại giúp Hiệp Hội Tình Thương đánh trận cuối", en: "6. Long decides to return and help the Charity Association in the final battle", bgColor: climaxColors[5].bg, textColor: climaxColors[5].text },
+                { id: 'n7', x: 4900, y: 2000, vi: "7. Long trở thành một anh hùng thực sự (Captain Vietnam)", en: "7. Long becomes a true hero (Captain Vietnam)", bgColor: climaxColors[6].bg, textColor: climaxColors[6].text },
+            ];
+
+            connections = [
+                { from: 'n1', to: 'n2', vi: "Gặp nhóm Ace, Lim Dim sau khi bị băng du côn đánh tơi bời", en: "Meets Ace, Lim Dim after being beaten by a gang" },
+                { from: 'n2', to: 'n3', vi: "Khám phá âm mưu máy phát sóng Xả Rác của Người Dơ", en: "Discovers the Dirty Man's Littering transmitter plot" },
+                { from: 'n3', to: 'n4', vi: "Bị đánh gãy các ngón tay, đồng đội cứu trễ. Mất niềm tin.", en: "Fingers broken, teammates rescue late. Loses faith." },
+                { from: 'n4', to: 'n5', vi: "Nhìn thấy mọi người xả rác, chen lấn và hiểu ra nguồn gốc cái xấu", en: "Sees people littering, pushing, and understands the root of evil" },
+                { from: 'n5', to: 'n6', vi: "Ông Năm hy sinh. Quyết tâm bảo vệ gia đình và xã hội", en: "Mr. Năm sacrifices himself. Determined to protect family and society" },
+                { from: 'n6', to: 'n7', vi: "Vô hiệu hóa máy phát sóng, đối đầu với Người Lạ", en: "Disables the transmitter, confronts the Stranger" }
+            ];
+
+            // Tự động phân bố sub-nodes hình tròn xung quanh
+            let tempSubNodes = [
+                { parent: 'n1', vi: "Long từ bé hay bị bắt nạt", en: "Long was often bullied since childhood" },
+                { parent: 'n1', vi: "Tàng hình trước Hân - crush của mình", en: "Invisible to Han - his crush" },
+                { parent: 'n1', vi: "Học không giỏi bằng bạn thân - Tín", en: "Not as good at studying as his best friend - Tin" },
+                
+                { parent: 'n2', vi: "Được huấn luyện bởi Ninja Đinh & Hiệp Sĩ Mù", en: "Trained by Ninja Dinh & Blind Knight" },
+                { parent: 'n2', vi: "Hạ băng Yêu Râu Xanh, Người Ăn Chặn", en: "Defeats Bluebeard Gang, Corrupt Eater" },
+                
+                { parent: 'n3', vi: "Không khai ra đồng đội dù bị đập nát tay", en: "Refuses to betray teammates despite smashed hands" },
+                { parent: 'n3', vi: "Người Dơ tra khảo dã man", en: "Dirty Man interrogates brutally" },
+                
+                { parent: 'n4', vi: "Trở về bán bánh xèo", en: "Returns to selling Banh Xeo" },
+                { parent: 'n4', vi: "Gia đình ngăn cản, sợ hãi vì thương tích", en: "Family discourages, fearful of injuries" },
+                
+                { parent: 'n5', vi: "Nhận ra 'leo lề' cũng là làm khổ người khác", en: "Realizes 'riding on sidewalks' hurts others too" },
+                { parent: 'n5', vi: "Chứng kiến Ti (em trai) suýt dính vào băng Dơ Dáy", en: "Witnesses Ti (younger brother) almost joining the Filthy Gang" },
+                
+                { parent: 'n6', vi: "Ba mẹ Long hiểu và ủng hộ con đường của Long", en: "Long's parents understand and support his path" },
+                { parent: 'n6', vi: "Hiệp hội Tình Thương bị bắt và tra tấn", en: "Charity Association is captured and tortured" },
+                
+                { parent: 'n7', vi: "Sức mạnh không đến từ đánh đấm, mà từ ý chí", en: "Strength comes not from fighting, but from willpower" },
+                { parent: 'n7', vi: "Hội bước ra ánh sáng, trở thành biểu tượng", en: "The Association steps into the light, becomes a symbol" },
+            ];
+
+            // Calculate absolute X,Y for subnodes based on parent position
+            const radius = 250;
+            subNodes = [];
+            
+            nodes.forEach(node => {
+                let children = tempSubNodes.filter(s => s.parent === node.id);
+                children.forEach((child, index) => {
+                    let angle = (index / children.length) * 2 * Math.PI - Math.PI/2;
+                    subNodes.push({
+                        id: 's' + Math.random().toString(36).substr(2, 9),
+                        parentId: node.id,
+                        x: node.x + Math.cos(angle) * radius,
+                        y: node.y + Math.sin(angle) * radius,
+                        vi: child.vi,
+                        en: child.en
+                    });
+                });
+            });
+        }
+
+        // Khởi tạo
+        initDefaultData();
+        
+        // Update Project Title Display
+        function updateProjectTitleDisplay() {
+            const titleEl = document.getElementById('project-title');
+            const subTitleEl = document.getElementById('project-subtitle');
+            
+            if (currentLang === 'vi') {
+                titleEl.innerText = projectTitleData.vi.main;
+                subTitleEl.innerText = projectTitleData.vi.sub;
+            } else {
+                titleEl.innerText = projectTitleData.en.main;
+                subTitleEl.innerText = projectTitleData.en.sub;
+            }
+        }
+        
+        // Event listener for opening Title Edit Modal
+        document.getElementById('project-title-container').addEventListener('click', () => {
+            if (!isEditMode) {
+                showMsg(currentLang === 'vi' ? "Vui lòng chuyển sang Chế độ Sửa (Edit) để thay đổi tiêu đề." : "Please switch to Edit mode to change the title.");
+                return;
+            }
+            
+            document.getElementById('title-main-vi').value = projectTitleData.vi.main;
+            document.getElementById('title-main-en').value = projectTitleData.en.main;
+            document.getElementById('title-sub-vi').value = projectTitleData.vi.sub;
+            document.getElementById('title-sub-en').value = projectTitleData.en.sub;
+            
+            document.getElementById('edit-title-modal').style.display = 'flex';
+        });
+        
+        window.saveProjectTitle = function() {
+            projectTitleData.vi.main = document.getElementById('title-main-vi').value;
+            projectTitleData.en.main = document.getElementById('title-main-en').value;
+            projectTitleData.vi.sub = document.getElementById('title-sub-vi').value;
+            projectTitleData.en.sub = document.getElementById('title-sub-en').value;
+            
+            updateProjectTitleDisplay();
+            saveToStorage();
+            closeModals();
+        }
+
+        function showMsg(msg) {
+            document.getElementById('msg-modal-content').innerText = msg;
+            document.getElementById('msg-modal').style.display = 'flex';
+        }
+
+        window.closeModals = function() {
+            document.querySelectorAll('.modal-overlay').forEach(el => el.style.display = 'none');
+            currentContextData = null;
+        }
+
+        // Hàm gọi AI Gemini dịch thuật tự động
+        window.translateTextUI = async function(from, to, sourceId, targetId) {
+            const sourceText = document.getElementById(sourceId).value;
+            if (!sourceText.trim()) return;
+            
+            const targetEl = document.getElementById(targetId);
+            targetEl.placeholder = "AI đang dịch...";
+            
+            try {
+                const prompt = `Translate the following text from ${from.toUpperCase()} to ${to.toUpperCase()}. Only return the translated text, no other comments.\n\nText: ${sourceText}`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }]
+                };
+                
+                // Canvas runtime auto injects key here
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+                    targetEl.value = result.candidates[0].content.parts[0].text.trim();
+                } else {
+                    targetEl.placeholder = "Dịch lỗi, vui lòng thử lại.";
+                }
+            } catch (err) {
+                console.error(err);
+                targetEl.placeholder = "Lỗi kết nối AI.";
+            }
+        }
+        
+        // Dịch ngầm khi ấn Lưu
+        async function autoTranslateMissing(viText, enText) {
+            if (viText && !enText) {
+                // Dịch VI -> EN
+                return await translateSilent(viText, "VI", "EN");
+            } else if (!viText && enText) {
+                // Dịch EN -> VI
+                return await translateSilent(enText, "EN", "VI");
+            }
+            return { vi: viText, en: enText };
+        }
+        
+        async function translateSilent(text, from, to) {
+            try {
+                const prompt = `Translate from ${from} to ${to}. Return ONLY translation.\nText: ${text}`;
+                const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                const trans = result.candidates[0].content.parts[0].text.trim();
+                return from === "VI" ? { vi: text, en: trans } : { vi: trans, en: text };
+            } catch (e) {
+                return from === "VI" ? { vi: text, en: "" } : { vi: "", en: text };
+            }
+        }
+
+        function renderMap() {
+            nodesLayer.innerHTML = '';
+            svgLayer.innerHTML = '';
+            
+            const titleContainer = document.getElementById('project-title-container');
+
+            // Vẽ liên kết chính (Main Connections)
+            connections.forEach((conn, index) => {
+                const n1 = nodes.find(n => n.id === conn.from);
+                const n2 = nodes.find(n => n.id === conn.to);
+                if (!n1 || !n2) return;
+
+                // Xác định line này có bị dim (làm mờ) không
+                // Line bị dim NẾU có activeMainNodeId VÀ cả 2 đầu n1, n2 đều không phải là activeNode
+                let isDimmed = false;
+                if (activeMainNodeId) {
+                    if (n1.id !== activeMainNodeId && n2.id !== activeMainNodeId) {
+                        isDimmed = true;
+                    }
+                }
+
+                const dimClass = isDimmed ? 'dimmed' : '';
+                const lineId = `line-main-${index}`;
+                const text = currentLang === 'vi' ? (conn.vi || '') : (conn.en || '');
+                
+                // Mũi tên cong
+                const dx = n2.x - n1.x;
+                const dy = n2.y - n1.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const cp1x = n1.x + dx/2 - dy * 0.2;
+                const cp1y = n1.y + dy/2 + dx * 0.2;
+
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute("d", `M ${n1.x} ${n1.y} Q ${cp1x} ${cp1y} ${n2.x} ${n2.y}`);
+                path.setAttribute("stroke", isDimmed ? "var(--line-color)" : "var(--accent)");
+                path.setAttribute("stroke-width", "3");
+                path.setAttribute("fill", "none");
+                path.setAttribute("marker-end", "url(#arrowhead)");
+                path.setAttribute("class", dimClass);
+                svgLayer.appendChild(path);
+
+                // Text trên line
+                if (text) {
+                    const midX = (n1.x + cp1x + n2.x) / 3;
+                    const midY = (n1.y + cp1y + n2.y) / 3;
+                    
+                    // Box background for text
+                    const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    // Ước lượng chiều dài text (đơn giản hóa)
+                    const textLen = Math.min(text.length * 7, 300); 
+                    bgRect.setAttribute("x", midX - textLen/2 - 10);
+                    bgRect.setAttribute("y", midY - 14);
+                    bgRect.setAttribute("width", textLen + 20);
+                    bgRect.setAttribute("height", "28");
+                    bgRect.setAttribute("fill", "var(--bg-color)");
+                    bgRect.setAttribute("rx", "14");
+                    bgRect.setAttribute("class", dimClass);
+                    svgLayer.appendChild(bgRect);
+
+                    const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    textEl.setAttribute("x", midX);
+                    textEl.setAttribute("y", midY + 4);
+                    textEl.setAttribute("text-anchor", "middle");
+                    textEl.setAttribute("fill", isDimmed ? "var(--text-muted)" : "var(--text-main)");
+                    textEl.setAttribute("font-size", "12px");
+                    textEl.setAttribute("class", dimClass);
+                    
+                    // Cắt text nếu quá dài
+                    let displayTxt = text;
+                    if(displayTxt.length > 50) displayTxt = displayTxt.substring(0, 47) + "...";
+                    textEl.textContent = displayTxt;
+
+                    textEl.addEventListener('contextmenu', (e) => {
+                        if(!isEditMode) return;
+                        showContextMenu(e, 'line', { index });
+                    });
+
+                    svgLayer.appendChild(textEl);
+                }
+            });
+
+            // Định nghĩa mũi tên SVG
+            const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+            defs.innerHTML = `
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="25" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent)" />
+                </marker>
+                <marker id="arrowhead-sub" markerWidth="8" markerHeight="6" refX="20" refY="3" orient="auto">
+                    <polygon points="0 0, 8 3, 0 6" fill="var(--line-color)" />
+                </marker>
+            `;
+            svgLayer.appendChild(defs);
+
+            // Vẽ Sub-nodes và Line nối với Sub-nodes
+            subNodes.forEach(sub => {
+                // Chỉ hiện subnode nếu Main node của nó đang active
+                if (activeMainNodeId && activeMainNodeId === sub.parentId) {
+                    const parent = nodes.find(n => n.id === sub.parentId);
+                    if (parent) {
+                        // Vẽ line
+                        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                        line.setAttribute("x1", parent.x);
+                        line.setAttribute("y1", parent.y);
+                        line.setAttribute("x2", sub.x);
+                        line.setAttribute("y2", sub.y);
+                        line.setAttribute("stroke", "var(--line-color)");
+                        line.setAttribute("stroke-width", "2");
+                        line.setAttribute("stroke-dasharray", "5,5");
+                        line.setAttribute("marker-end", "url(#arrowhead-sub)");
+                        svgLayer.appendChild(line);
+
+                        // Vẽ HTML Node
+                        const el = document.createElement('div');
+                        el.className = 'sub-node focused'; // Mặc định hiện ra là đang focus to 20%
+                        el.style.left = sub.x + 'px';
+                        el.style.top = sub.y + 'px';
+                        el.innerText = currentLang === 'vi' ? sub.vi : sub.en;
+                        
+                        // Event kéo thả
+                        el.addEventListener('mousedown', (e) => handleNodeMouseDown(e, sub.id, 'sub'));
+                        
+                        el.addEventListener('contextmenu', (e) => {
+                            if(!isEditMode) return;
+                            showContextMenu(e, 'sub', { id: sub.id });
+                        });
+
+                        nodesLayer.appendChild(el);
+                    }
+                }
+            });
+
+            // Vẽ Main nodes
+            nodes.forEach(node => {
+                let isDimmed = false;
+                let isFocused = false;
+                
+                if (activeMainNodeId) {
+                    if (activeMainNodeId === node.id) {
+                        isFocused = true;
+                    } else {
+                        isDimmed = true;
+                    }
+                }
+
+                const el = document.createElement('div');
+                el.className = 'node';
+                if (isDimmed) el.classList.add('dimmed');
+                if (isFocused) el.classList.add('focused');
+                
+                el.style.left = node.x + 'px';
+                el.style.top = node.y + 'px';
+                el.style.backgroundColor = node.bgColor || 'var(--node-bg)';
+                el.style.color = node.textColor || 'var(--text-main)';
+                el.innerText = currentLang === 'vi' ? node.vi : node.en;
+
+                el.addEventListener('mousedown', (e) => handleNodeMouseDown(e, node.id, 'main'));
+                el.addEventListener('click', (e) => {
+                    // Tránh click khi đang kéo
+                    if (wasPanning) return;
+                    e.stopPropagation();
+                    
+                    if (activeMainNodeId === node.id) {
+                        // Đóng lại
+                        activeMainNodeId = null;
+                        renderMap();
+                        autoFocusFit(); 
+                    } else {
+                        // Mở ra
+                        activeMainNodeId = node.id;
+                        renderMap();
+                        focusOnCluster(node.id);
+                    }
+                });
+
+                el.addEventListener('contextmenu', (e) => {
+                    if(!isEditMode) return;
+                    e.stopPropagation();
+                    showContextMenu(e, 'main', { id: node.id });
+                });
+
+                nodesLayer.appendChild(el);
+            });
+            
+            // Xử lý làm mờ Title Container nếu có Node được chọn
+            if (activeMainNodeId) {
+                titleContainer.style.opacity = '0.3';
+            } else {
+                titleContainer.style.opacity = '1';
+            }
+        }
+
+        function handleNodeMouseDown(e, id, type) {
+            if (!isEditMode) return; // Khóa kéo khi ở chế độ Đọc
+            if (e.button !== 0) return; // Chỉ chuột trái
+            e.stopPropagation();
+            closeContextMenu();
+
+            draggingElement = { id, type };
+            
+            // Tìm object data
+            let obj = type === 'main' ? nodes.find(n => n.id === id) : subNodes.find(n => n.id === id);
+            
+            let startClientX = e.clientX;
+            let startClientY = e.clientY;
+            let initialX = obj.x;
+            let initialY = obj.y;
+
+            function onMouseMove(moveEvent) {
+                // Chia cho tỷ lệ scale để kéo chuẩn không bị văng
+                const dx = (moveEvent.clientX - startClientX) / transform.scale;
+                const dy = (moveEvent.clientY - startClientY) / transform.scale;
+                
+                obj.x = initialX + dx;
+                obj.y = initialY + dy;
+                
+                renderMap(); // Vẽ lại liên tục
+            }
+
+            function onMouseUp() {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                draggingElement = null;
+                saveToStorage(); // Tự động lưu sau khi kéo
+            }
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        }
+
+        function updateTransform() {
+            mapContainer.style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`;
+        }
+
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            isPanning = true;
+            wasPanning = false;
+            startPanMouse = { x: e.clientX, y: e.clientY };
+            startPanTransform = { x: transform.x, y: transform.y };
+            closeContextMenu();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            const dx = e.clientX - startPanMouse.x;
+            const dy = e.clientY - startPanMouse.y;
+            
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) wasPanning = true;
+
+            transform.x = startPanTransform.x + dx;
+            transform.y = startPanTransform.y + dy;
+            updateTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isPanning) {
+                isPanning = false;
+                saveToStorage();
+            }
+        });
+
+        // Click vùng trống để deselect
+        viewport.addEventListener('click', (e) => {
+            if (!wasPanning && activeMainNodeId) {
+                activeMainNodeId = null;
+                renderMap();
+                autoFocusFit();
+            }
+        });
+
+        // Mouse Wheel Zoom
+        viewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = viewport.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const zoomDelta = e.deltaY < 0 ? 0.1 : -0.1;
+            setZoom(transform.scale + zoomDelta, mouseX, mouseY);
+        }, { passive: false });
+
+        function setZoom(newScale, mouseX = window.innerWidth/2, mouseY = window.innerHeight/2) {
+            const oldScale = transform.scale;
+            newScale = Math.max(0.1, Math.min(newScale, 3)); // Max zoom out = 0.1
+            
+            // Tính toán bù trừ tọa độ để zoom ngay tại con trỏ chuột
+            transform.x = mouseX - (mouseX - transform.x) * (newScale / oldScale);
+            transform.y = mouseY - (mouseY - transform.y) * (newScale / oldScale);
+            transform.scale = newScale;
+            
+            updateTransform();
+            saveToStorage();
+        }
+
+        // Auto Focus Animation (Smooth)
+        function animateTransform(targetX, targetY, targetScale) {
+            const startX = transform.x;
+            const startY = transform.y;
+            const startScale = transform.scale;
+            const duration = 400; // ms
+            const startTime = performance.now();
+
+            function step(currentTime) {
+                let progress = (currentTime - startTime) / duration;
+                if (progress > 1) progress = 1;
+                
+                // Ease out cubic
+                const ease = 1 - Math.pow(1 - progress, 3);
+                
+                transform.x = startX + (targetX - startX) * ease;
+                transform.y = startY + (targetY - startY) * ease;
+                transform.scale = startScale + (targetScale - startScale) * ease;
+                
+                updateTransform();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    saveToStorage();
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        // Tự động gom hết map vừa khung
+        window.autoFocusFit = function() {
+            if (nodes.length === 0) return;
+            
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            nodes.forEach(n => {
+                if(n.x < minX) minX = n.x;
+                if(n.x > maxX) maxX = n.x;
+                if(n.y < minY) minY = n.y;
+                if(n.y > maxY) maxY = n.y;
+            });
+            // Cộng thêm padding
+            minX -= 300; maxX += 300;
+            minY -= 300; maxY += 300;
+
+            const contentWidth = maxX - minX;
+            const contentHeight = maxY - minY;
+            const viewWidth = window.innerWidth;
+            const viewHeight = window.innerHeight;
+
+            const scaleX = viewWidth / contentWidth;
+            const scaleY = viewHeight / contentHeight;
+            let targetScale = Math.min(scaleX, scaleY);
+            targetScale = Math.max(0.1, Math.min(targetScale, 1.5)); // Giới hạn
+
+            const centerX = minX + contentWidth / 2;
+            const centerY = minY + contentHeight / 2;
+
+            const targetX = viewWidth / 2 - centerX * targetScale;
+            const targetY = viewHeight / 2 - centerY * targetScale;
+
+            animateTransform(targetX, targetY, targetScale);
+        }
+
+        // Tự động focus vào 1 cụm Node (Node chính + Node phụ)
+        function focusOnCluster(mainNodeId) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            
+            const mainNode = nodes.find(n => n.id === mainNodeId);
+            if(!mainNode) return;
+
+            minX = mainNode.x; maxX = mainNode.x;
+            minY = mainNode.y; maxY = mainNode.y;
+
+            subNodes.filter(s => s.parentId === mainNodeId).forEach(s => {
+                if(s.x < minX) minX = s.x;
+                if(s.x > maxX) maxX = s.x;
+                if(s.y < minY) minY = s.y;
+                if(s.y > maxY) maxY = s.y;
+            });
+
+            // Padding nhẹ
+            minX -= 250; maxX += 250;
+            minY -= 250; maxY += 250;
+
+            const contentWidth = maxX - minX;
+            const contentHeight = maxY - minY;
+            const viewWidth = window.innerWidth;
+            const viewHeight = window.innerHeight;
+
+            const scaleX = viewWidth / contentWidth;
+            const scaleY = viewHeight / contentHeight;
+            let targetScale = Math.min(scaleX, scaleY);
+            targetScale = Math.max(0.5, Math.min(targetScale, 1.2)); // Scale vừa đẹp
+
+            const centerX = minX + contentWidth / 2;
+            const centerY = minY + contentHeight / 2;
+
+            const targetX = viewWidth / 2 - centerX * targetScale;
+            const targetY = viewHeight / 2 - centerY * targetScale;
+
+            animateTransform(targetX, targetY, targetScale);
+        }
+
+        function showContextMenu(e, type, data) {
+            currentContextData = { type, ...data };
+            contextMenu.innerHTML = '';
+
+            let items = [];
+            
+            if (type === 'main') {
+                items.push({ label: '✎ Sửa nội dung & màu', action: () => openEditModal() });
+                items.push({ label: '➕ Thêm Note phụ', action: () => addSubNode() });
+            } else if (type === 'sub') {
+                items.push({ label: '✎ Sửa nội dung', action: () => openEditModal() });
+                items.push({ label: '🗑 Xóa Note', action: () => deleteItem(), danger: true });
+            } else if (type === 'line') {
+                items.push({ label: '✎ Sửa chữ trên đường nối', action: () => openEditModal() });
+            }
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `menu-item ${item.danger ? 'danger' : ''}`;
+                div.innerText = item.label;
+                div.onclick = () => {
+                    item.action();
+                    contextMenu.style.display = 'none';
+                };
+                contextMenu.appendChild(div);
+            });
+
+            contextMenu.style.left = e.clientX + 'px';
+            contextMenu.style.top = e.clientY + 'px';
+            contextMenu.style.display = 'block';
+        }
+
+        window.addEventListener('click', () => {
+            contextMenu.style.display = 'none';
+        });
+
+        // Edit Modal
+        function openEditModal() {
+            const { type, id, index } = currentContextData;
+            document.getElementById('edit-modal').style.display = 'flex';
+            
+            const colorGroup = document.getElementById('color-picker-group');
+            let obj;
+
+            if (type === 'main') {
+                obj = nodes.find(n => n.id === id);
+                document.getElementById('edit-modal-title').innerText = "Sửa Ô Chính";
+                colorGroup.style.display = 'block';
+                document.getElementById('edit-bg-color').value = obj.bgColor || '#1f2937';
+                document.getElementById('edit-text-color').value = obj.textColor || '#f9fafb';
+            } else if (type === 'sub') {
+                obj = subNodes.find(n => n.id === id);
+                document.getElementById('edit-modal-title').innerText = "Sửa Ô Phụ";
+                colorGroup.style.display = 'none';
+            } else if (type === 'line') {
+                obj = connections[index];
+                document.getElementById('edit-modal-title').innerText = "Sửa Text Mũi Tên";
+                colorGroup.style.display = 'none';
+            }
+
+            document.getElementById('edit-text-vi').value = obj.vi || '';
+            document.getElementById('edit-text-en').value = obj.en || '';
+        }
+
+        window.saveEdit = async function() {
+            const { type, id, index } = currentContextData;
+            const btn = document.querySelector('#edit-modal .btn-primary');
+            btn.innerText = "Đang xử lý...";
+            btn.disabled = true;
+
+            let vi = document.getElementById('edit-text-vi').value;
+            let en = document.getElementById('edit-text-en').value;
+            
+            // Auto translate if one is missing
+            const transResult = await autoTranslateMissing(vi, en);
+            vi = transResult.vi;
+            en = transResult.en;
+
+            if (type === 'main') {
+                const node = nodes.find(n => n.id === id);
+                node.vi = vi;
+                node.en = en;
+                node.bgColor = document.getElementById('edit-bg-color').value;
+                node.textColor = document.getElementById('edit-text-color').value;
+            } else if (type === 'sub') {
+                const node = subNodes.find(n => n.id === id);
+                node.vi = vi;
+                node.en = en;
+            } else if (type === 'line') {
+                connections[index].vi = vi;
+                connections[index].en = en;
+            }
+
+            btn.innerText = "Lưu thay đổi";
+            btn.disabled = false;
+            
+            closeModals();
+            renderMap();
+            saveToStorage();
+        }
+
+        // Actions
+        function addSubNode() {
+            const parentId = currentContextData.id;
+            const parent = nodes.find(n => n.id === parentId);
+            
+            // Tìm góc phù hợp nhất hoặc random để ko bị đè
+            const angle = Math.random() * 2 * Math.PI;
+            subNodes.push({
+                id: 's' + Math.random().toString(36).substr(2, 9),
+                parentId: parentId,
+                x: parent.x + Math.cos(angle) * 200,
+                y: parent.y + Math.sin(angle) * 200,
+                vi: "Ghi chú mới",
+                en: "New note"
+            });
+            renderMap();
+            saveToStorage();
+            
+            // Tự động focus để hiện node mới ra
+            activeMainNodeId = parentId;
+            focusOnCluster(parentId);
+        }
+
+        function deleteItem() {
+            const { type, id } = currentContextData;
+            if (type === 'sub') {
+                subNodes = subNodes.filter(n => n.id !== id);
+                renderMap();
+                saveToStorage();
+            }
+        }
+
+        const STORAGE_KEY = 'MindMap_Data_V2';
+
+        function saveToStorage() {
+            const data = {
+                projectTitle: projectTitleData,
+                nodes,
+                subNodes,
+                connections,
+                transform // Lưu cả tọa độ view và zoom
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+
+        function loadFromStorage() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    if (data.projectTitle) projectTitleData = data.projectTitle;
+                    nodes = data.nodes || nodes;
+                    subNodes = data.subNodes || subNodes;
+                    connections = data.connections || connections;
+                    if (data.transform) {
+                        transform = data.transform;
+                    }
+                    return true;
+                } catch (e) {
+                    console.error("Lỗi đọc dữ liệu", e);
+                }
+            }
+            return false;
+        }
+
+        // Giao diện Export
+        document.getElementById('btn-export').addEventListener('click', () => {
+            const data = JSON.stringify({ projectTitle: projectTitleData, nodes, subNodes, connections, transform }, null, 2);
+            document.getElementById('export-code').value = data;
+            document.getElementById('io-export-section').style.display = 'block';
+            document.getElementById('io-import-section').style.display = 'none';
+            document.getElementById('io-modal-title').innerText = "Lưu File (Export)";
+            document.getElementById('io-modal').style.display = 'flex';
+        });
+
+        window.triggerDownload = function() {
+            const data = document.getElementById('export-code').value;
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'MindMap_Backup.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            closeModals();
+            showMsg("Đã yêu cầu tải file thành công!");
+        }
+
+        window.copyExportCode = function() {
+            const copyText = document.getElementById('export-code');
+            copyText.select();
+            document.execCommand('copy');
+            showMsg("Đã copy dữ liệu vào Clipboard! Bạn có thể dán vào 1 file text.");
+        }
+
+        // Giao diện Import
+        document.getElementById('btn-import').addEventListener('click', () => {
+            document.getElementById('import-code').value = '';
+            document.getElementById('import-file').value = '';
+            document.getElementById('io-export-section').style.display = 'none';
+            document.getElementById('io-import-section').style.display = 'block';
+            document.getElementById('io-modal-title').innerText = "Tải File (Import)";
+            document.getElementById('io-modal').style.display = 'flex';
+        });
+
+        window.processImport = function() {
+            const fileInput = document.getElementById('import-file');
+            const codeInput = document.getElementById('import-code').value;
+
+            if (fileInput.files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    applyImportData(e.target.result);
+                };
+                reader.readAsText(fileInput.files[0]);
+            } else if (codeInput.trim()) {
+                applyImportData(codeInput);
+            } else {
+                showMsg("Vui lòng dán code hoặc chọn file!");
+            }
+        }
+
+        function applyImportData(jsonString) {
+            try {
+                const data = JSON.parse(jsonString);
+                
+                // Tự động nhận diện & chuyển đổi định dạng cũ (V1 - mindmap_hhtt_backup.json)
+                if (data.mainNodes && data.edges) {
+                    nodes = data.mainNodes.map(m => ({
+                        id: m.id,
+                        x: m.x,
+                        y: m.y,
+                        vi: m.text?.vi || "",
+                        en: m.text?.en || "",
+                        bgColor: m.bgColor || 'var(--node-bg)',
+                        textColor: m.textColor || 'var(--text-main)'
+                    }));
+                    
+                    subNodes = [];
+                    data.mainNodes.forEach(m => {
+                        if (m.subNodes) {
+                            m.subNodes.forEach(s => {
+                                subNodes.push({
+                                    id: s.id,
+                                    parentId: m.id,
+                                    x: s.x,
+                                    y: s.y,
+                                    vi: s.text?.vi || "",
+                                    en: s.text?.en || ""
+                                });
+                            });
+                        }
+                    });
+                    
+                    connections = data.edges.map(e => ({
+                        from: e.from,
+                        to: e.to,
+                        vi: e.text?.vi || "",
+                        en: e.text?.en || ""
+                    }));
+                    
+                    transform = { x: 0, y: 0, scale: 1 };
+                } 
+                // Định dạng mới (V2)
+                else if (data.nodes && data.subNodes) {
+                    if (data.projectTitle) projectTitleData = data.projectTitle;
+                    nodes = data.nodes;
+                    subNodes = data.subNodes;
+                    connections = data.connections || connections;
+                    transform = data.transform || { x: 0, y: 0, scale: 1 };
+                } else {
+                    showMsg("File không đúng định dạng MindMap.");
+                    return;
+                }
+
+                saveToStorage();
+                updateTransform();
+                renderMap();
+                setTimeout(autoFocusFit, 100);
+                closeModals();
+                showMsg("Phục hồi dữ liệu thành công!");
+            } catch (e) {
+                console.error("Import Error: ", e);
+                showMsg("Mã JSON không hợp lệ.");
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const hasData = loadFromStorage();
+            updateProjectTitleDisplay();
+            renderMap();
+            updateTransform();
+            
+            if (!hasData) {
+                // Nếu chưa có data cũ, tự động fit khung màn hình lúc khởi chạy
+                setTimeout(autoFocusFit, 100);
+            }
+        });
+
+        document.getElementById('btn-lang').addEventListener('click', () => {
+            currentLang = currentLang === 'vi' ? 'en' : 'vi';
+            updateProjectTitleDisplay();
+            renderMap();
+        });
+        
+        document.getElementById('btn-toggle-edit').addEventListener('click', (e) => {
+            isEditMode = !isEditMode;
+            const btn = e.target;
+            if (isEditMode) {
+                btn.textContent = "Chế độ: Sửa (Edit)";
+                btn.classList.remove('mode-read');
+                btn.classList.add('mode-edit');
+                document.body.classList.add('edit-mode');
+            } else {
+                btn.textContent = "Chế độ: Đọc (Read)";
+                btn.classList.remove('mode-edit');
+                btn.classList.add('mode-read');
+                document.body.classList.remove('edit-mode');
+                closeContextMenu();
+            }
+        });
+
+        document.getElementById('btn-zoom-in').addEventListener('click', () => setZoom(transform.scale + 0.2));
+        document.getElementById('btn-zoom-out').addEventListener('click', () => setZoom(transform.scale - 0.2));
+        document.getElementById('btn-zoom-fit').addEventListener('click', () => autoFocusFit());
+
+    </script>
+</body>
+</html>
