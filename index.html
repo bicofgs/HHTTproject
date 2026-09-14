@@ -474,6 +474,10 @@
     </div>
 
     <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         // ==============================================================================
         // 🚀 CÁCH LÀM MẶC ĐỊNH BẢN CHỈNH SỬA CHO GITHUB PAGES:
         // 1. Lên web của bạn, sắp xếp layout cho đẹp. Nhấn "Lưu" -> "Copy Code".
@@ -848,8 +852,37 @@
         let activeMainNodeId = null;
         let currentContextData = null; 
 
-        // Data Storage
+        // Data Storage & Cloud Sync
         const STORAGE_KEY = 'MindMap_Data_V4_Dark';
+        
+        // --- CẤU HÌNH CLOUD SYNC (FIREBASE) ---
+        // LƯU Ý: Nếu mang lên GitHub cá nhân, hãy thay null bằng cấu hình Firebase của bạn
+        // VD: const myGitHubFirebaseConfig = { apiKey: "...", authDomain: "...", projectId: "..." };
+        const firebaseConfig = {
+
+            apiKey: "AIzaSyC4Ws78vIYlGu1YrCCe73ARRsFdSjWjn70",
+
+            authDomain: "hhtt-mindmap-webhost.firebaseapp.com",
+
+            projectId: "hhtt-mindmap-webhost",
+
+            storageBucket: "hhtt-mindmap-webhost.firebasestorage.app",
+
+            messagingSenderId: "648852328702",
+
+            appId: "1:648852328702:web:dc254c79efee507d4b15af",
+
+            measurementId: "G-7NBFW6V9EG"
+
+        };
+
+        const envFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const firebaseConfig = myGitHubFirebaseConfig || envFirebaseConfig;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mindmap-hhtt';
+        
+        let db, auth;
+        let isCloudEnabled = false;
+        let lastCloudDataStr = "";
 
         let projectTitleData = {
             vi: { main: "MIND MAP: HIỆP HỘI TÌNH THƯƠNG", sub: "Phân tích đường dây câu chuyện & Cao trào nhân vật Long" },
@@ -1466,6 +1499,79 @@
         function saveToStorage() {
             const data = { projectTitle: projectTitleData, nodes, subNodes, connections, transform };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            saveToCloud(); // Gắn Trigger lưu lên Cloud
+        }
+
+        // --- CÁC HÀM XỬ LÝ CLOUD (FIREBASE TỰ ĐỘNG ĐỒNG BỘ) ---
+        async function initCloud() {
+            if (!firebaseConfig) {
+                console.log("Chạy chế độ Offline. Để đồng bộ trên GitHub, bạn cần tự thêm Firebase Config vào code.");
+                return;
+            }
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                if (!auth.currentUser) return;
+                
+                isCloudEnabled = true;
+                listenToCloud();
+            } catch (error) {
+                console.error("Lỗi khởi tạo Cloud:", error);
+            }
+        }
+
+        function listenToCloud() {
+            if (!isCloudEnabled || !auth.currentUser) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'mindmaps', 'shared_map');
+            
+            onSnapshot(docRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const data = snapshot.data();
+                    
+                    // Lọc bỏ thuộc tính transform (Tọa độ camera) để không làm giật màn hình của người khác
+                    const newDataStr = JSON.stringify({ projectTitle: data.projectTitle, nodes: data.nodes, subNodes: data.subNodes, connections: data.connections });
+                    
+                    // So sánh dữ liệu để tránh vòng lặp lưu/nhận liên tục khi chính mình là người gửi
+                    if (newDataStr !== lastCloudDataStr) {
+                        lastCloudDataStr = newDataStr;
+                        projectTitleData = data.projectTitle || projectTitleData;
+                        nodes = data.nodes || nodes;
+                        subNodes = data.subNodes || subNodes;
+                        connections = data.connections || connections;
+                        
+                        updateProjectTitleDisplay();
+                        renderMap();
+                    }
+                } else {
+                    // Lần đầu chưa có data trên server, đẩy data dưới máy lên khởi tạo
+                    saveToCloud();
+                }
+            }, (error) => {
+                console.error("Lỗi đồng bộ dữ liệu Cloud:", error);
+            });
+        }
+
+        function saveToCloud() {
+            if (!isCloudEnabled || !auth.currentUser) return;
+            
+            const dataToSave = { projectTitle: projectTitleData, nodes, subNodes, connections };
+            const newDataStr = JSON.stringify(dataToSave);
+            
+            // Check nếu data y hệt đợt trước (VD: do bạn chỉ Zoom/Pan màn hình) thì bỏ qua, không đẩy lên Cloud tránh lãng phí
+            if (newDataStr === lastCloudDataStr) return; 
+            
+            lastCloudDataStr = newDataStr;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'mindmaps', 'shared_map');
+            
+            setDoc(docRef, dataToSave).catch(e => console.error("Lỗi lưu lên Cloud:", e));
         }
 
         function loadFromStorage() {
@@ -1595,6 +1701,9 @@
             updateProjectTitleDisplay();
             renderMap();
             updateTransform();
+            
+            // Khởi chạy hệ thống đồng bộ trực tuyến
+            initCloud();
             
             // Luôn auto fit màn hình ở lần đầu chạy
             setTimeout(autoFocusFit, 100);
