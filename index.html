@@ -474,6 +474,360 @@
     </div>
 
     <script type="module">
+        // ==============================================================================
+        // 🚀 CÁCH LÀM MẶC ĐỊNH BẢN CHỈNH SỬA CHO GITHUB PAGES:
+        // 1. Lên web của bạn, sắp xếp layout cho đẹp. Nhấn "Lưu" -> "Copy Code".
+        // 2. Dán toàn bộ đoạn code đó vào giữa 2 dấu backtick (`) ở biến bên dưới.
+        // 3. Save file html này và đẩy lên GitHub. Xong!
+        // ==============================================================================
+        const DEFAULT_JSON_DATA = `{
+  "projectTitle": {
+    "vi": {
+      "main": "MIND MAP: HIỆP HỘI TÌNH THƯƠNG",
+      "sub": "Phân tích đường dây câu chuyện & Cao trào nhân vật Long"
+    },
+    "en": {
+      "main": "MIND MAP: ASSOCIATION OF COMPASSION",
+      "sub": "Storyline Analysis & Character Arc of Long"
+    }
+  },
+  "nodes": [
+    {
+      "id": "m1",
+      "x": 1864.905911296038,
+      "y": 3486.397028752918,
+      "vi": "1. Long muốn trở thành anh hùng để được nổi tiếng",
+      "en": "1. Long wants to become a hero for fame",
+      "bgColor": "#b91c1c",
+      "textColor": "#ffffff"
+    },
+    {
+      "id": "m2",
+      "x": 1991.1501299189729,
+      "y": 2997.424520649132,
+      "vi": "2. Long gia nhập Hiệp Hội Tình Thương và trở nên mạnh mẽ hơn",
+      "en": "2. Long joins the Compassion Association and gets stronger",
+      "bgColor": "#1d4ed8",
+      "textColor": "#ffffff"
+    },
+    {
+      "id": "m3",
+      "x": 2407.6377613940736,
+      "y": 2518.000938826015,
+      "vi": "3. Long bị băng Dơ Dáy bắt cóc, tra tấn và bị thương nặng",
+      "en": "3. Long is kidnapped, tortured, and badly injured by the Filthy Gang",
+      "bgColor": "#475569",
+      "textColor": "#ffffff"
+    },
+    {
+      "id": "m4",
+      "x": 2772.556956364493,
+      "y": 3014.9400664178247,
+      "vi": "4. Long quyết định từ bỏ anh hùng và trở về cuộc sống bình thường",
+      "en": "4. Long decides to quit being a hero and returns to a normal life",
+      "bgColor": "#64748b",
+      "textColor": "#ffffff"
+    },
+    {
+      "id": "m5",
+      "x": 2985.0822807432924,
+      "y": 3600.687483266868,
+      "vi": "5. Long nhận ra mình dần trở thành một villain mà trước đây mình từng chiến đấu",
+      "en": "5. Long realizes he is slowly becoming a villain he once fought against",
+      "bgColor": "#d97706",
+      "textColor": "#ffffff"
+    },
+    {
+      "id": "m6",
+      "x": 3621.415502954765,
+      "y": 2498.378996750543,
+      "vi": "6. Long quyết định quay lại giúp Hiệp Hội Tình Thương đánh trận cuối",
+      "en": "6. Long decides to return and help the Association fight the final battle",
+      "bgColor": "#047857",
+      "textColor": "#ffffff"
+    },
+    {
+      "id": "m7",
+      "x": 4102.735133298888,
+      "y": 3339.947036020584,
+      "vi": "7. Long trở thành một anh hùng thực sự",
+      "en": "7. Long becomes a true hero",
+      "bgColor": "#6d28d9",
+      "textColor": "#ffffff"
+    }
+  ],
+  "subNodes": [
+    {
+      "id": "s1_1",
+      "parentId": "m1",
+      "x": 1646.7911755021319,
+      "y": 3170.5435540192116,
+      "vi": "Long từ bé hay bị bắt nạt",
+      "en": "Long was frequently bullied since childhood"
+    },
+    {
+      "id": "s1_2",
+      "parentId": "m1",
+      "x": 1844.9478379472127,
+      "y": 3780.4156476759176,
+      "vi": "Tàng hình trước Hân - crush của mình",
+      "en": "Feels invisible to Han, his crush"
+    },
+    {
+      "id": "s1_3",
+      "parentId": "m1",
+      "x": 1514.0157694495863,
+      "y": 3448.1253143866147,
+      "vi": "Học kém hơn bạn thân - Tín",
+      "en": "Performs worse academically than his best friend, Tin"
+    },
+    {
+      "id": "s1_4",
+      "parentId": "m1",
+      "x": 2255.5549827710333,
+      "y": 3341.790772795182,
+      "vi": "Ba mẹ mong đợi Long ra trường có việc làm ổn định",
+      "en": "Parents expect Long to have a stable job after graduation."
+    },
+    {
+      "id": "m1-sub-1789373302436",
+      "parentId": "m1",
+      "x": 2143.237268854,
+      "y": 3629.697791879275,
+      "vi": "Ti - em trai Long - rất hâm mộ Captain Vietnam",
+      "en": "Ti, Long's younger brother, is a big fan of Captain Vietnam."
+    },
+    {
+      "id": "s2_1",
+      "parentId": "m2",
+      "x": 1546.5522391364602,
+      "y": 2903.6499849878155,
+      "vi": "Được Ace, Lim Dim, Ninja Đinh giải cứu ngoài hẻm",
+      "en": "Rescued in the alley by Ace, Lim Dim, and Ninja Dinh"
+    },
+    {
+      "id": "s2_2",
+      "parentId": "m2",
+      "x": 1929.9320893065105,
+      "y": 2742.791229196392,
+      "vi": "Huấn luyện võ thuật khắc nghiệt cùng Ninja Đinh & Hiệp sĩ mù",
+      "en": "Undergoes rigorous martial arts training with Ninja Dinh & Blind Knight"
+    },
+    {
+      "id": "s2_3",
+      "parentId": "m2",
+      "x": 2323.963681899942,
+      "y": 2989.2207096508987,
+      "vi": "Lần lượt đánh bại: Người Hát, Người Yêu, Người Ăn",
+      "en": "Sequentially defeats: The Singer, The Lover, and The Eater"
+    },
+    {
+      "id": "s2_4",
+      "parentId": "m2",
+      "x": 2182.798191881488,
+      "y": 3374.6940972961406,
+      "vi": "Tạo blog sống ảo khoe thành tích",
+      "en": "Creates a flashy blog to show off his achievements"
+    },
+    {
+      "id": "m2-sub-1789372378285",
+      "parentId": "m2",
+      "x": 2477.32447414467,
+      "y": 3374.218002577626,
+      "vi": "Gặp lại Hân nhưng bị hoài nghi mục đích bản thân",
+      "en": "Meeting Han again but having one's motives questioned"
+    },
+    {
+      "id": "m2-sub-1789373546699",
+      "parentId": "m2",
+      "x": 1651.6715732819166,
+      "y": 3094.662377460442,
+      "vi": "Hiểu rõ hơn về Hiệp Hội Tình Thương và các đồng đội",
+      "en": "Gain a better understanding of the Compassion Association and teammates"
+    },
+    {
+      "id": "s3_1",
+      "parentId": "m3",
+      "x": 2443.3992391666134,
+      "y": 2901.836989360659,
+      "vi": "Cãi vã lớn với đồng đội sau khi được giải cứu (một cách chậm trễ)",
+      "en": "Major argument with teammates after being rescued (belatedly)"
+    },
+    {
+      "id": "s3_2",
+      "parentId": "m3",
+      "x": 2725.777992737824,
+      "y": 2588.783031049199,
+      "vi": "Bị đập gãy các ngón tay dã man",
+      "en": "His fingers are brutally broken with a hammer"
+    },
+    {
+      "id": "s3_3",
+      "parentId": "m3",
+      "x": 2412.1813399270773,
+      "y": 2247.432621568705,
+      "vi": "Ba mẹ hăm dọa đuổi khỏi nhà nếu không về",
+      "en": "My parents are threatening to kick him out of the house if he doesn't come home."
+    },
+    {
+      "id": "s3_4",
+      "parentId": "m3",
+      "x": 2142.949102673116,
+      "y": 2404.189108108425,
+      "vi": "Được Ace cảnh báo trước về hậu quả qua việc dẫn đi gặp ông Năm",
+      "en": "Ace warned Long about the consequences beforehand by taking him to meet Mr. Nam."
+    },
+    {
+      "id": "s4_2",
+      "parentId": "m4",
+      "x": 2626.488888135697,
+      "y": 3208.852767634627,
+      "vi": "Xóa trang blog Captain Vietnam",
+      "en": "Deletes his 'Captain Vietnam' blog"
+    },
+    {
+      "id": "s4_3",
+      "parentId": "m4",
+      "x": 3018.605458275274,
+      "y": 3029.9371220305957,
+      "vi": "Xin đi làm công trình xây dựng cùng Tín",
+      "en": "Applies for a construction job alongside Tin"
+    },
+    {
+      "id": "m4-sub-1789373406604",
+      "parentId": "m4",
+      "x": 2821.2472062075885,
+      "y": 2795.752966636715,
+      "vi": "Hiểu ra anh hùng thật sự là hy sinh chứ ko phải hào nhoáng",
+      "en": "Realizing that a true hero is about sacrifice, not glamour."
+    },
+    {
+      "id": "s5_1",
+      "parentId": "m5",
+      "x": 3288.726705921944,
+      "y": 3514.5403428663544,
+      "vi": "Chấp nhận thói quen 'leo lề' giống Băng Chen Lấn",
+      "en": "Adopts the habit of 'driving on sidewalks' like the Shoving Gang"
+    },
+    {
+      "id": "s5_2",
+      "parentId": "m5",
+      "x": 2697.345939162534,
+      "y": 3689.9411681276456,
+      "vi": "Chứng kiến Băng Dơ Dáy bày các em nhỏ quăng rác xuống sông",
+      "en": "Witnessing the Dirty Gang teaching children to throw trash into the river."
+    },
+    {
+      "id": "s5_3",
+      "parentId": "m5",
+      "x": 2547.524248544579,
+      "y": 3321.3924660333623,
+      "vi": "Phụ ba mẹ bán quán. Tiếp tục đổ dầu ăn xuống cống",
+      "en": "Helping parents with the shop. Continuing to pour cooking oil down the drain."
+    },
+    {
+      "id": "s6_1",
+      "parentId": "m6",
+      "x": 3960.7047149349332,
+      "y": 2503.152611307281,
+      "vi": "Chứng kiến Ông Năm Cổ Đại hy sinh để bảo vệ môi trường",
+      "en": "Witnesses Mr. Nam Ancient sacrifice himself to protect the environment"
+    },
+    {
+      "id": "s6_2",
+      "parentId": "m6",
+      "x": 3298.9752428164284,
+      "y": 2546.5596056072404,
+      "vi": "Ba mẹ thấu hiểu và ủng hộ lý tưởng của Long",
+      "en": "His parents understand and support Long's ideals"
+    },
+    {
+      "id": "s6_3",
+      "parentId": "m6",
+      "x": 3672.7390997178627,
+      "y": 2235.274270404766,
+      "vi": "Có lại niềm tin vào mục đích của mình",
+      "en": "Regaining faith in his purpose"
+    },
+    {
+      "id": "m6-sub-1789373848824",
+      "parentId": "m6",
+      "x": 3608.8962109641716,
+      "y": 2764.5137382115036,
+      "vi": "Dùng kỹ năng đã được học và sự đổi mới trong tư duy để chiến thắng",
+      "en": "Use learned skills and innovative thinking to win."
+    },
+    {
+      "id": "s7_1",
+      "parentId": "m7",
+      "x": 4450.393692523303,
+      "y": 3108.074663075462,
+      "vi": "Hiệp Hội Tình Thương cũng bước ra ánh sáng",
+      "en": "The Association of Compassion also stepped into the light."
+    },
+    {
+      "id": "s7_2",
+      "parentId": "m7",
+      "x": 4095.774018155489,
+      "y": 3600.177101955712,
+      "vi": "Gặp lại Hân. Nhưng Hân đã có bạn trai. Còn Long thì có đồng đội",
+      "en": "Meeting Han again. But Han already has a boyfriend. As for Long, he has teammates."
+    },
+    {
+      "id": "s7_3",
+      "parentId": "m7",
+      "x": 3709.4960290926315,
+      "y": 3192.165761742712,
+      "vi": "Trở thành anh hùng thầm lặng, không màng danh lợi",
+      "en": "Becomes a silent hero, disregarding fame and fortune"
+    }
+  ],
+  "connections": [
+    {
+      "from": "m1",
+      "to": "m2",
+      "vi": "Ngày càng nổi tiếng, được Hiệp Hội Tình Thương để mắt",
+      "en": "Increasingly famous, caught the eye of the Compassion Association"
+    },
+    {
+      "from": "m2",
+      "to": "m3",
+      "vi": "Mâu thuẫn với gia đình và bản thân tăng dần",
+      "en": "Conflicts with family and oneself are gradually increasing."
+    },
+    {
+      "from": "m3",
+      "to": "m4",
+      "vi": "Sợ hãi, mất niềm tin & bị thương nặng",
+      "en": "Afraid, loses faith & severely injured"
+    },
+    {
+      "from": "m4",
+      "to": "m5",
+      "vi": "Dòng đời xô đẩy, nhắm mắt làm ngơ",
+      "en": "Pushed by life's flow, turns a blind eye"
+    },
+    {
+      "from": "m5",
+      "to": "m6",
+      "vi": "Cái chết của Ông Năm làm Long thức tỉnh",
+      "en": "Mr. Nam's death awakens Long"
+    },
+    {
+      "from": "m6",
+      "to": "m7",
+      "vi": "Phối hợp cùng đồng đội phá hủy âm mưu",
+      "en": "Coordinates with teammates to destroy the plot"
+    }
+  ],
+  "transform": {
+    "x": -1030.695783077038,
+    "y": -1699.4961739538803,
+    "scale": 0.7730678724942018
+  }
+}`; 
+
+
         const viewport = document.getElementById('viewport');
         const mapContainer = document.getElementById('map-container');
         const svgLayer = document.getElementById('svg-layer');
@@ -495,7 +849,7 @@
         let currentContextData = null; 
 
         // Data Storage
-        const STORAGE_KEY = 'MindMap_Data_V3_Dark';
+        const STORAGE_KEY = 'MindMap_Data_V4_Dark';
 
         let projectTitleData = {
             vi: { main: "MIND MAP: HIỆP HỘI TÌNH THƯƠNG", sub: "Phân tích đường dây câu chuyện & Cao trào nhân vật Long" },
@@ -1181,7 +1535,7 @@
             }
         }
 
-        function applyImportData(jsonString) {
+        function applyImportData(jsonString, isSilent = false) {
             try {
                 const data = JSON.parse(jsonString);
                 
@@ -1209,18 +1563,35 @@
                     connections = data.connections || connections;
                     transform = data.transform || { x: 0, y: 0, scale: 1 };
                 } else {
-                    showMsg("File không đúng định dạng."); return;
+                    if(!isSilent) showMsg("File không đúng định dạng."); 
+                    return;
                 }
 
                 saveToStorage(); updateProjectTitleDisplay();
                 updateTransform(); renderMap();
                 setTimeout(autoFocusFit, 100);
-                closeModals(); showMsg("Phục hồi dữ liệu thành công!");
-            } catch (e) { showMsg("Mã JSON không hợp lệ."); }
+                
+                if(!isSilent) {
+                    closeModals(); 
+                    showMsg("Phục hồi dữ liệu thành công!");
+                }
+            } catch (e) { 
+                if(!isSilent) showMsg("Mã JSON không hợp lệ."); 
+            }
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            if (!loadFromStorage()) initDefaultData();
+            let hasLocalData = loadFromStorage();
+            
+            if (!hasLocalData) {
+                // Nếu người dùng mới vào lần đầu, kiểm tra xem có code JSON cứng không
+                if (DEFAULT_JSON_DATA.trim() !== "") {
+                    applyImportData(DEFAULT_JSON_DATA, true); // load im lặng, không hiện thông báo
+                } else {
+                    initDefaultData(); // Nếu không có thì load mặc định demo
+                }
+            }
+            
             updateProjectTitleDisplay();
             renderMap();
             updateTransform();
